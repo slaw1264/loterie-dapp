@@ -10,52 +10,44 @@ const contractABI = [
   "function gagnant() public view returns (address)",
 ];
 
+// RPC public Base Mainnet
+const BASE_RPC = "https://mainnet.base.org";
+
 export default function Loterie() {
   const [account, setAccount] = useState(null);
-  const [provider, setProvider] = useState(null);
-  const [contract, setContract] = useState(null);
+  const [provider, setProvider] = useState(null); // pour Metamask
+  const [contract, setContract] = useState(null); // pour Metamask
   const [participants, setParticipants] = useState([]);
   const [winner, setWinner] = useState(null);
 
-  // Fonction pour switcher le réseau vers Base Mainnet
-  const switchToBase = async () => {
-    if (!window.ethereum) return alert("Installe Metamask !");
-
-    try {
-      await window.ethereum.request({
-        method: "wallet_switchEthereumChain",
-        params: [{ chainId: "0x2105" }], // 0x2105 = 8453 en hex
-      });
-    } catch (switchError) {
-      // Si le réseau n'existe pas dans Metamask
-      if (switchError.code === 4902) {
-        try {
-          await window.ethereum.request({
-            method: "wallet_addEthereumChain",
-            params: [
-              {
-                chainId: "0x2105",
-                chainName: "Base Mainnet",
-                rpcUrls: ["https://mainnet.base.org"],
-                nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
-                blockExplorerUrls: ["https://basescan.org"],
-              },
-            ],
-          });
-        } catch (addError) {
-          console.error("Erreur ajout réseau :", addError);
-        }
-      } else {
-        console.error("Erreur switch réseau :", switchError);
-      }
-    }
-  };
+  // Provider public pour lecture seule
+  const publicProvider = new ethers.JsonRpcProvider(BASE_RPC);
+  const publicContract = new ethers.Contract(contractAddress, contractABI, publicProvider);
 
   const connectWallet = async () => {
     if (!window.ethereum) return alert("Installe Metamask !");
-
-    // Switch vers Base Mainnet si nécessaire
-    await switchToBase();
+    try {
+      // Switch réseau si nécessaire
+      await window.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: "0x2105" }],
+      });
+    } catch (switchError) {
+      if (switchError.code === 4902) {
+        await window.ethereum.request({
+          method: "wallet_addEthereumChain",
+          params: [
+            {
+              chainId: "0x2105",
+              chainName: "Base Mainnet",
+              rpcUrls: [BASE_RPC],
+              nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+              blockExplorerUrls: ["https://basescan.org"],
+            },
+          ],
+        });
+      }
+    }
 
     const prov = new ethers.BrowserProvider(window.ethereum);
     await prov.send("eth_requestAccounts", []);
@@ -69,16 +61,21 @@ export default function Loterie() {
     setContract(ctr);
   };
 
+  // Lire participants et gagnant en lecture seule
   const loadPlayers = async () => {
-    if (!contract) return;
-    const length = Number(await contract.joueursLength());
-    const list = [];
-    for (let i = 0; i < length; i++) {
-      list.push(await contract.joueurs(i));
+    try {
+      const length = Number(await publicContract.joueursLength());
+      const list = [];
+      for (let i = 0; i < length; i++) {
+        list.push(await publicContract.joueurs(i));
+      }
+      setParticipants(list);
+
+      const w = await publicContract.gagnant();
+      setWinner(w !== "0x0000000000000000000000000000000000000000" ? w : null);
+    } catch (err) {
+      console.error("Erreur lecture participants :", err);
     }
-    setParticipants(list);
-    const w = await contract.gagnant();
-    setWinner(w !== "0x0000000000000000000000000000000000000000" ? w : null);
   };
 
   const participer = async () => {
@@ -89,15 +86,15 @@ export default function Loterie() {
   };
 
   const tirerGagnant = async () => {
-    if (!contract) return;
+    if (!contract) return alert("Connecte Metamask d’abord !");
     const tx = await contract.tirerAuSort({ gasLimit: 300000 });
     await tx.wait();
     loadPlayers();
   };
 
   useEffect(() => {
-    if (contract) loadPlayers();
-  }, [contract]);
+    loadPlayers(); // Charge les participants et gagnant même sans wallet
+  }, []);
 
   return (
     <div
