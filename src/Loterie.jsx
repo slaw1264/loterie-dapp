@@ -6,24 +6,22 @@ const contractABI = [
   "function participer() external",
   "function tirerGagnant() external",
   "function getParticipants() external view returns(address[])",
-  "function owner() view returns(address)" // si tu avais getter owner
 ];
 
-// RPC public Base Mainnet fiable
+// RPC public Base Mainnet
 const BASE_RPC = "https://mainnet.base.org";
 
-// Adresse du propriétaire (déployeur) si pas de getter owner dans le contrat
+// Adresse du propriétaire (déployeur)
 const OWNER_ADDRESS = "0xE5d49eca38466FF0Bd7c66Bad16f787Ad0957816";
 
 export default function Loterie() {
   const [account, setAccount] = useState(null);
-  const [provider, setProvider] = useState(null); // pour Metamask
-  const [contract, setContract] = useState(null); // pour Metamask
+  const [provider, setProvider] = useState(null);
+  const [contract, setContract] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [winner, setWinner] = useState(null);
-  const [owner, setOwner] = useState(null);
+  const [owner, setOwner] = useState(OWNER_ADDRESS);
 
-  // Provider public pour lecture seule
   const publicProvider = new ethers.JsonRpcProvider(BASE_RPC);
   const publicContract = new ethers.Contract(contractAddress, contractABI, publicProvider);
 
@@ -64,26 +62,21 @@ export default function Loterie() {
     setContract(ctr);
   };
 
+  // Déconnexion du wallet
+  const disconnectWallet = () => {
+    setAccount(null);
+    setProvider(null);
+    setContract(null);
+  };
+
   // Lire participants publiquement
   const loadPlayers = async () => {
     try {
       const list = await publicContract.getParticipants();
       setParticipants(list);
-      setWinner(null); // gagnant seulement via owner
+      setWinner(null);
     } catch (err) {
       console.error("Erreur lecture participants :", err);
-    }
-  };
-
-  // Définir owner
-  const loadOwner = async () => {
-    try {
-      // Si le contrat avait un getter owner : 
-      // const o = await publicContract.owner();
-      // setOwner(o);
-      setOwner(OWNER_ADDRESS); // sinon on hardcode l'adresse du déployeur
-    } catch (err) {
-      console.error("Erreur récupération owner :", err);
     }
   };
 
@@ -103,12 +96,29 @@ export default function Loterie() {
     loadPlayers();
   };
 
-  // Rafraîchissement automatique participants toutes les 10 secondes
+  // Rafraîchissement automatique et écoute des changements de comptes
   useEffect(() => {
     loadPlayers();
-    loadOwner();
     const interval = setInterval(loadPlayers, 10000);
-    return () => clearInterval(interval);
+
+    if (window.ethereum) {
+      window.ethereum.on("accountsChanged", (accounts) => {
+        if (accounts.length === 0) {
+          disconnectWallet();
+        } else {
+          setAccount(accounts[0]);
+          const signer = new ethers.BrowserProvider(window.ethereum).getSigner();
+          setContract(new ethers.Contract(contractAddress, contractABI, signer));
+        }
+      });
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (window.ethereum?.removeListener) {
+        window.ethereum.removeListener("accountsChanged", () => {});
+      }
+    };
   }, []);
 
   return (
@@ -135,9 +145,12 @@ export default function Loterie() {
           <button onClick={participer} style={{ marginRight: "10px" }}>
             Participer
           </button>
-          {account && owner && account.toLowerCase() === owner.toLowerCase() && (
-            <button onClick={tirerGagnant}>Tirer le gagnant</button>
+          {account.toLowerCase() === owner.toLowerCase() && (
+            <button onClick={tirerGagnant} style={{ marginRight: "10px" }}>
+              Tirer le gagnant
+            </button>
           )}
+          <button onClick={disconnectWallet}>Déconnecter le wallet</button>
         </div>
       )}
 
