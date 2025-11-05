@@ -17,8 +17,46 @@ export default function Loterie() {
   const [participants, setParticipants] = useState([]);
   const [winner, setWinner] = useState(null);
 
+  // Fonction pour switcher le réseau vers Base Mainnet
+  const switchToBase = async () => {
+    if (!window.ethereum) return alert("Installe Metamask !");
+
+    try {
+      await window.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: "0x2105" }], // 0x2105 = 8453 en hex
+      });
+    } catch (switchError) {
+      // Si le réseau n'existe pas dans Metamask
+      if (switchError.code === 4902) {
+        try {
+          await window.ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [
+              {
+                chainId: "0x2105",
+                chainName: "Base Mainnet",
+                rpcUrls: ["https://mainnet.base.org"],
+                nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+                blockExplorerUrls: ["https://basescan.org"],
+              },
+            ],
+          });
+        } catch (addError) {
+          console.error("Erreur ajout réseau :", addError);
+        }
+      } else {
+        console.error("Erreur switch réseau :", switchError);
+      }
+    }
+  };
+
   const connectWallet = async () => {
     if (!window.ethereum) return alert("Installe Metamask !");
+
+    // Switch vers Base Mainnet si nécessaire
+    await switchToBase();
+
     const prov = new ethers.BrowserProvider(window.ethereum);
     await prov.send("eth_requestAccounts", []);
     const signer = await prov.getSigner();
