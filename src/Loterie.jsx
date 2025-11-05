@@ -3,17 +3,15 @@ import { ethers } from "ethers";
 
 const contractAddress = "0xdf06c3B2B27eff7AC7d238a883724dE1Be988005";
 const contractABI = [
-  "function participer() public",
-  "function tirerAuSort() public",
-  "function joueurs(uint256) public view returns (address)",
-  "function joueursLength() public view returns (uint256)",
-  "function gagnant() public view returns (address)",
+  "function participer() external",
+  "function tirerGagnant() external",
+  "function getParticipants() external view returns(address[])",
 ];
 
 // RPC public Base Mainnet fiable
 const BASE_RPC = "https://mainnet.base.org";
 
-// Adresse du déployeur / propriétaire
+// Adresse du propriétaire (déployeur)
 const OWNER_ADDRESS = "0xE5d49eca38466FF0Bd7c66Bad16f787Ad0957816";
 
 export default function Loterie() {
@@ -66,18 +64,12 @@ export default function Loterie() {
     setContract(ctr);
   };
 
-  // Lire participants et gagnant via provider public
+  // Lire participants publiquement
   const loadPlayers = async () => {
     try {
-      const length = Number(await publicContract.joueursLength());
-      const list = [];
-      for (let i = 0; i < length; i++) {
-        list.push(await publicContract.joueurs(i));
-      }
+      const list = await publicContract.getParticipants();
       setParticipants(list);
-
-      const w = await publicContract.gagnant();
-      setWinner(w !== "0x0000000000000000000000000000000000000000" ? w : null);
+      setWinner(null); // le gagnant est tiré uniquement par l’owner
     } catch (err) {
       console.error("Erreur lecture participants :", err);
     }
@@ -94,14 +86,14 @@ export default function Loterie() {
   // Tirer le gagnant (seul owner)
   const tirerGagnant = async () => {
     if (!contract) return alert("Connecte Metamask d’abord !");
-    const tx = await contract.tirerAuSort({ gasLimit: 300000 });
+    const tx = await contract.tirerGagnant({ gasLimit: 300000 });
     await tx.wait();
     loadPlayers();
   };
 
-  // Refresh automatique participants + gagnant toutes les 10s
+  // Rafraîchissement automatique participants toutes les 10 secondes
   useEffect(() => {
-    loadPlayers(); // initial
+    loadPlayers();
     const interval = setInterval(loadPlayers, 10000);
     return () => clearInterval(interval);
   }, []);
