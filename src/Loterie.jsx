@@ -12,7 +12,6 @@ const contractABI = [
 // RPC public Base Mainnet
 const BASE_RPC = "https://mainnet.base.org";
 
-
 const OWNER_ADDRESS = "0x6035158EA3dDa7309259b3F8aF368bebB62d8C52";
 
 export default function Loterie() {
@@ -21,6 +20,7 @@ export default function Loterie() {
   const [contract, setContract] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [winner, setWinner] = useState(null);
+  const [isDisconnected, setIsDisconnected] = useState(false);
 
   const publicProvider = new ethers.JsonRpcProvider(BASE_RPC);
   const publicContract = new ethers.Contract(contractAddress, contractABI, publicProvider);
@@ -57,16 +57,18 @@ export default function Loterie() {
 
     setAccount(addr);
     setProvider(prov);
+    setIsDisconnected(false);
 
     const ctr = new ethers.Contract(contractAddress, contractABI, signer);
     setContract(ctr);
   };
 
-  // Déconnexion wallet (réinitialisation UI)
+  // Déconnexion wallet côté UI
   const disconnectWallet = () => {
     setAccount(null);
     setProvider(null);
     setContract(null);
+    setIsDisconnected(true);
   };
 
   // Lecture publique des participants
@@ -116,6 +118,7 @@ export default function Loterie() {
           setAccount(accounts[0]);
           const signer = new ethers.BrowserProvider(window.ethereum).getSigner();
           setContract(new ethers.Contract(contractAddress, contractABI, signer));
+          setIsDisconnected(false);
         }
       });
     }
@@ -142,7 +145,12 @@ export default function Loterie() {
     >
       <h1>🎟️ Loterie Base Mainnet</h1>
 
-      {!account ? (
+      {isDisconnected ? (
+        <div>
+          <p>Wallet déconnecté. Cliquez sur "Connecter Metamask" pour participer.</p>
+          <button onClick={connectWallet}>Connecter Metamask</button>
+        </div>
+      ) : !account ? (
         <div>
           <p>Connectez Metamask pour participer à la loterie !</p>
           <button onClick={connectWallet}>Connecter Metamask</button>
