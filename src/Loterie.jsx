@@ -6,12 +6,13 @@ const contractABI = [
   "function participer() external",
   "function tirerGagnant() external",
   "function getParticipants() external view returns(address[])",
+  "function owner() view returns(address)" // si tu avais getter owner
 ];
 
 // RPC public Base Mainnet fiable
 const BASE_RPC = "https://mainnet.base.org";
 
-// Adresse du propriétaire (déployeur)
+// Adresse du propriétaire (déployeur) si pas de getter owner dans le contrat
 const OWNER_ADDRESS = "0xE5d49eca38466FF0Bd7c66Bad16f787Ad0957816";
 
 export default function Loterie() {
@@ -20,7 +21,7 @@ export default function Loterie() {
   const [contract, setContract] = useState(null); // pour Metamask
   const [participants, setParticipants] = useState([]);
   const [winner, setWinner] = useState(null);
-  const [owner, setOwner] = useState(OWNER_ADDRESS);
+  const [owner, setOwner] = useState(null);
 
   // Provider public pour lecture seule
   const publicProvider = new ethers.JsonRpcProvider(BASE_RPC);
@@ -30,7 +31,6 @@ export default function Loterie() {
   const connectWallet = async () => {
     if (!window.ethereum) return alert("Installe Metamask !");
     try {
-      // Switch réseau Base si nécessaire
       await window.ethereum.request({
         method: "wallet_switchEthereumChain",
         params: [{ chainId: "0x2105" }],
@@ -69,9 +69,21 @@ export default function Loterie() {
     try {
       const list = await publicContract.getParticipants();
       setParticipants(list);
-      setWinner(null); // le gagnant est tiré uniquement par l’owner
+      setWinner(null); // gagnant seulement via owner
     } catch (err) {
       console.error("Erreur lecture participants :", err);
+    }
+  };
+
+  // Définir owner
+  const loadOwner = async () => {
+    try {
+      // Si le contrat avait un getter owner : 
+      // const o = await publicContract.owner();
+      // setOwner(o);
+      setOwner(OWNER_ADDRESS); // sinon on hardcode l'adresse du déployeur
+    } catch (err) {
+      console.error("Erreur récupération owner :", err);
     }
   };
 
@@ -94,6 +106,7 @@ export default function Loterie() {
   // Rafraîchissement automatique participants toutes les 10 secondes
   useEffect(() => {
     loadPlayers();
+    loadOwner();
     const interval = setInterval(loadPlayers, 10000);
     return () => clearInterval(interval);
   }, []);
@@ -122,7 +135,7 @@ export default function Loterie() {
           <button onClick={participer} style={{ marginRight: "10px" }}>
             Participer
           </button>
-          {account.toLowerCase() === owner.toLowerCase() && (
+          {account && owner && account.toLowerCase() === owner.toLowerCase() && (
             <button onClick={tirerGagnant}>Tirer le gagnant</button>
           )}
         </div>
