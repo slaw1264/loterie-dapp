@@ -10,8 +10,11 @@ const contractABI = [
   "function gagnant() public view returns (address)",
 ];
 
-// RPC public Base Mainnet
+// RPC public Base Mainnet fiable
 const BASE_RPC = "https://mainnet.base.org";
+
+// Adresse du déployeur / propriétaire
+const OWNER_ADDRESS = "0xE5d49eca38466FF0Bd7c66Bad16f787Ad0957816";
 
 export default function Loterie() {
   const [account, setAccount] = useState(null);
@@ -19,15 +22,17 @@ export default function Loterie() {
   const [contract, setContract] = useState(null); // pour Metamask
   const [participants, setParticipants] = useState([]);
   const [winner, setWinner] = useState(null);
+  const [owner, setOwner] = useState(OWNER_ADDRESS);
 
   // Provider public pour lecture seule
   const publicProvider = new ethers.JsonRpcProvider(BASE_RPC);
   const publicContract = new ethers.Contract(contractAddress, contractABI, publicProvider);
 
+  // Connexion Metamask
   const connectWallet = async () => {
     if (!window.ethereum) return alert("Installe Metamask !");
     try {
-      // Switch réseau si nécessaire
+      // Switch réseau Base si nécessaire
       await window.ethereum.request({
         method: "wallet_switchEthereumChain",
         params: [{ chainId: "0x2105" }],
@@ -61,7 +66,7 @@ export default function Loterie() {
     setContract(ctr);
   };
 
-  // Lire participants et gagnant en lecture seule
+  // Lire participants et gagnant via provider public
   const loadPlayers = async () => {
     try {
       const length = Number(await publicContract.joueursLength());
@@ -78,6 +83,7 @@ export default function Loterie() {
     }
   };
 
+  // Participer à la loterie
   const participer = async () => {
     if (!contract) return alert("Connecte Metamask d’abord !");
     const tx = await contract.participer({ gasLimit: 300000 });
@@ -85,6 +91,7 @@ export default function Loterie() {
     loadPlayers();
   };
 
+  // Tirer le gagnant (seul owner)
   const tirerGagnant = async () => {
     if (!contract) return alert("Connecte Metamask d’abord !");
     const tx = await contract.tirerAuSort({ gasLimit: 300000 });
@@ -92,8 +99,11 @@ export default function Loterie() {
     loadPlayers();
   };
 
+  // Refresh automatique participants + gagnant toutes les 10s
   useEffect(() => {
-    loadPlayers(); // Charge les participants et gagnant même sans wallet
+    loadPlayers(); // initial
+    const interval = setInterval(loadPlayers, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -120,7 +130,9 @@ export default function Loterie() {
           <button onClick={participer} style={{ marginRight: "10px" }}>
             Participer
           </button>
-          <button onClick={tirerGagnant}>Tirer le gagnant</button>
+          {account.toLowerCase() === owner.toLowerCase() && (
+            <button onClick={tirerGagnant}>Tirer le gagnant</button>
+          )}
         </div>
       )}
 
