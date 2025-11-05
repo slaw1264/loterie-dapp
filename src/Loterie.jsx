@@ -40,7 +40,7 @@ export default function Loterie() {
     }
     setParticipants(list);
     const w = await contract.gagnant();
-    setWinner(w);
+    setWinner(w !== "0x0000000000000000000000000000000000000000" ? w : null);
   };
 
   const participer = async () => {
@@ -62,25 +62,43 @@ export default function Loterie() {
   }, [contract]);
 
   return (
-    <div style={{ textAlign: "center", marginTop: "50px", color: "#fff" }}>
+    <div
+      style={{
+        textAlign: "center",
+        minHeight: "100vh",
+        paddingTop: "50px",
+        color: "#fff",
+        backgroundColor: "#1a1a1a",
+        fontFamily: "Arial, sans-serif",
+      }}
+    >
       <h1>🎟️ Loterie Base Mainnet</h1>
 
       {!account ? (
-        <button onClick={connectWallet}>Connecter Metamask</button>
+        <div>
+          <p>Connectez Metamask pour participer à la loterie !</p>
+          <button onClick={connectWallet}>Connecter Metamask</button>
+        </div>
       ) : (
-        <>
+        <div>
           <p>Adresse : {account}</p>
-          <button onClick={participer}>Participer</button>
+          <button onClick={participer} style={{ marginRight: "10px" }}>
+            Participer
+          </button>
           <button onClick={tirerGagnant}>Tirer le gagnant</button>
-        </>
+        </div>
       )}
 
       <h3>Participants :</h3>
-      <ul>
-        {participants.map((p, i) => (
-          <li key={i}>{p}</li>
-        ))}
-      </ul>
+      {participants.length === 0 ? (
+        <p>Aucun participant pour le moment</p>
+      ) : (
+        <ul>
+          {participants.map((p, i) => (
+            <li key={i}>{p}</li>
+          ))}
+        </ul>
+      )}
 
       {winner && <h2>🎉 Gagnant : {winner}</h2>}
     </div>
