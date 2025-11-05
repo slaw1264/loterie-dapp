@@ -6,13 +6,14 @@ const contractABI = [
   "function participer() external",
   "function tirerGagnant() external",
   "function getParticipants() external view returns(address[])",
+  "event GagnantTire(address winner)"
 ];
 
 // RPC public Base Mainnet
 const BASE_RPC = "https://mainnet.base.org";
 
-// Adresse du propriétaire (déployeur)
-const OWNER_ADDRESS = "0xE5d49eca38466FF0Bd7c66Bad16f787Ad0957816";
+
+const OWNER_ADDRESS = "0x6035158EA3dDa7309259b3F8aF368bebB62d8C52";
 
 export default function Loterie() {
   const [account, setAccount] = useState(null);
@@ -20,7 +21,6 @@ export default function Loterie() {
   const [contract, setContract] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [winner, setWinner] = useState(null);
-  const [owner, setOwner] = useState(OWNER_ADDRESS);
 
   const publicProvider = new ethers.JsonRpcProvider(BASE_RPC);
   const publicContract = new ethers.Contract(contractAddress, contractABI, publicProvider);
@@ -62,19 +62,18 @@ export default function Loterie() {
     setContract(ctr);
   };
 
-  // Déconnexion du wallet
+  // Déconnexion wallet (réinitialisation UI)
   const disconnectWallet = () => {
     setAccount(null);
     setProvider(null);
     setContract(null);
   };
 
-  // Lire participants publiquement
+  // Lecture publique des participants
   const loadPlayers = async () => {
     try {
       const list = await publicContract.getParticipants();
       setParticipants(list);
-      setWinner(null);
     } catch (err) {
       console.error("Erreur lecture participants :", err);
     }
@@ -96,11 +95,19 @@ export default function Loterie() {
     loadPlayers();
   };
 
-  // Rafraîchissement automatique et écoute des changements de comptes
   useEffect(() => {
     loadPlayers();
+
+    // Rafraîchissement automatique participants
     const interval = setInterval(loadPlayers, 10000);
 
+    // Écoute des événements GagnantTire
+    publicContract.on("GagnantTire", (winnerAddress) => {
+      setWinner(winnerAddress);
+      loadPlayers();
+    });
+
+    // Gestion changement de compte Metamask
     if (window.ethereum) {
       window.ethereum.on("accountsChanged", (accounts) => {
         if (accounts.length === 0) {
@@ -118,6 +125,7 @@ export default function Loterie() {
       if (window.ethereum?.removeListener) {
         window.ethereum.removeListener("accountsChanged", () => {});
       }
+      publicContract.removeAllListeners("GagnantTire");
     };
   }, []);
 
@@ -145,7 +153,7 @@ export default function Loterie() {
           <button onClick={participer} style={{ marginRight: "10px" }}>
             Participer
           </button>
-          {account.toLowerCase() === owner.toLowerCase() && (
+          {account.toLowerCase() === OWNER_ADDRESS.toLowerCase() && (
             <button onClick={tirerGagnant} style={{ marginRight: "10px" }}>
               Tirer le gagnant
             </button>
