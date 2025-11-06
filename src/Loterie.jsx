@@ -9,23 +9,20 @@ const contractABI = [
   "event GagnantTire(address winner)"
 ];
 
-// RPC public Base Mainnet
 const BASE_RPC = "https://mainnet.base.org";
-
 const OWNER_ADDRESS = "0x6035158EA3dDa7309259b3F8aF368bebB62d8C52";
 
 export default function Loterie() {
   const [account, setAccount] = useState(null);
   const [provider, setProvider] = useState(null);
   const [contract, setContract] = useState(null);
-  const [participants, setParticipants] = useState([]);
+  const [participantsCount, setParticipantsCount] = useState(0);
   const [winner, setWinner] = useState(null);
   const [isDisconnected, setIsDisconnected] = useState(false);
 
   const publicProvider = new ethers.JsonRpcProvider(BASE_RPC);
   const publicContract = new ethers.Contract(contractAddress, contractABI, publicProvider);
 
-  // Connexion Metamask
   const connectWallet = async () => {
     if (!window.ethereum) return alert("Installe Metamask !");
     try {
@@ -63,7 +60,6 @@ export default function Loterie() {
     setContract(ctr);
   };
 
-  // Déconnexion wallet côté UI
   const disconnectWallet = () => {
     setAccount(null);
     setProvider(null);
@@ -71,17 +67,15 @@ export default function Loterie() {
     setIsDisconnected(true);
   };
 
-  // Lecture publique des participants
   const loadPlayers = async () => {
     try {
       const list = await publicContract.getParticipants();
-      setParticipants(list);
+      setParticipantsCount(list.length);
     } catch (err) {
       console.error("Erreur lecture participants :", err);
     }
   };
 
-  // Participer à la loterie
   const participer = async () => {
     if (!contract) return alert("Connecte Metamask d’abord !");
     const tx = await contract.participer({ gasLimit: 300000 });
@@ -89,7 +83,6 @@ export default function Loterie() {
     loadPlayers();
   };
 
-  // Tirer le gagnant (seul owner)
   const tirerGagnant = async () => {
     if (!contract) return alert("Connecte Metamask d’abord !");
     const tx = await contract.tirerGagnant({ gasLimit: 300000 });
@@ -100,16 +93,13 @@ export default function Loterie() {
   useEffect(() => {
     loadPlayers();
 
-    // Rafraîchissement automatique participants
     const interval = setInterval(loadPlayers, 10000);
 
-    // Écoute des événements GagnantTire
     publicContract.on("GagnantTire", (winnerAddress) => {
       setWinner(winnerAddress);
       loadPlayers();
     });
 
-    // Gestion changement de compte Metamask
     if (window.ethereum) {
       window.ethereum.on("accountsChanged", (accounts) => {
         if (accounts.length === 0) {
@@ -133,55 +123,60 @@ export default function Loterie() {
   }, []);
 
   return (
-    <div
-      style={{
-        textAlign: "center",
-        minHeight: "100vh",
-        paddingTop: "50px",
-        color: "#fff",
-        backgroundColor: "#1a1a1a",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <h1>🎟️ Loterie Base Mainnet</h1>
+    <div className="flex flex-col items-center min-h-screen bg-gradient-to-b from-gray-900 to-black text-white p-8 font-sans">
+      <h1 className="text-4xl font-bold mb-8">🎟️ Loterie Base Mainnet</h1>
 
-      {isDisconnected ? (
-        <div>
-          <p>Wallet déconnecté. Cliquez sur "Connecter Metamask" pour participer.</p>
-          <button onClick={connectWallet}>Connecter Metamask</button>
-        </div>
-      ) : !account ? (
-        <div>
-          <p>Connectez Metamask pour participer à la loterie !</p>
-          <button onClick={connectWallet}>Connecter Metamask</button>
-        </div>
-      ) : (
-        <div>
-          <p>Adresse : {account}</p>
-          <button onClick={participer} style={{ marginRight: "10px" }}>
-            Participer
+      {!account ? (
+        <div className="text-center">
+          <p className="mb-4">Connecte ton wallet pour participer à la loterie !</p>
+          <button
+            onClick={connectWallet}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl shadow-lg transition"
+          >
+            Connecter Metamask
           </button>
-          {account.toLowerCase() === OWNER_ADDRESS.toLowerCase() && (
-            <button onClick={tirerGagnant} style={{ marginRight: "10px" }}>
-              Tirer le gagnant
+        </div>
+      ) : (
+        <div className="text-center mb-8">
+          <p className="mb-2 text-gray-300 break-all">Adresse : {account}</p>
+          <div className="flex flex-wrap justify-center gap-4 mt-4">
+            <button
+              onClick={participer}
+              className="bg-green-600 hover:bg-green-700 px-6 py-2 rounded-xl shadow-lg transition"
+            >
+              Participer
             </button>
-          )}
-          <button onClick={disconnectWallet}>Déconnecter le wallet</button>
+            {account.toLowerCase() === OWNER_ADDRESS.toLowerCase() && (
+              <button
+                onClick={tirerGagnant}
+                className="bg-purple-600 hover:bg-purple-700 px-6 py-2 rounded-xl shadow-lg transition"
+              >
+                Tirer le gagnant
+              </button>
+            )}
+            <button
+              onClick={disconnectWallet}
+              className="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-xl shadow-lg transition"
+            >
+              Déconnecter
+            </button>
+          </div>
         </div>
       )}
 
-      <h3>Participants :</h3>
-      {participants.length === 0 ? (
-        <p>Aucun participant pour le moment</p>
-      ) : (
-        <ul>
-          {participants.map((p, i) => (
-            <li key={i}>{p}</li>
-          ))}
-        </ul>
-      )}
+      <div className="bg-gray-800 rounded-2xl p-6 shadow-xl w-full max-w-md text-center">
+        <h3 className="text-2xl mb-4 font-semibold">Participants</h3>
+        <p className="text-lg">
+          Nombre de participants :{" "}
+          <span className="font-bold text-yellow-400">{participantsCount}</span>
+        </p>
+      </div>
 
-      {winner && <h2>🎉 Gagnant : {winner}</h2>}
+      {winner && (
+        <div className="mt-8 bg-gradient-to-r from-yellow-500 to-orange-500 text-black rounded-2xl px-6 py-4 shadow-xl text-center">
+          <h2 className="text-2xl font-bold">🎉 Gagnant : {winner}</h2>
+        </div>
+      )}
     </div>
   );
 }
